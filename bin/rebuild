@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# Rebuild the claude-code and codex images from scratch, so the CLIs (installed
+# at "latest") and base image are actually refreshed rather than served from
+# the layer cache.
+#
+# Usage: bin/rebuild [claude|codex]...   (default: both)
+
+set -e
+set -o pipefail
+
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
+
+if ! command -v "$CONTAINER_ENGINE" >/dev/null 2>&1; then
+	echo "Error: container engine '$CONTAINER_ENGINE' not found in PATH." >&2
+	exit 1
+fi
+
+targets=("$@")
+if [ ${#targets[@]} -eq 0 ]; then
+	targets=(claude codex)
+fi
+
+for target in "${targets[@]}"; do
+	case "$target" in
+	claude) tag=claude-code:latest ;;
+	codex) tag=codex:latest ;;
+	*)
+		echo "Unknown target: $target (expected claude or codex)" >&2
+		exit 1
+		;;
+	esac
+
+	echo "==> Building $tag" >&2
+	"$CONTAINER_ENGINE" build \
+		--pull \
+		--no-cache \
+		--tag "$tag" \
+		--file "$repo_dir/Containerfile.$target" \
+		"$repo_dir"
+done

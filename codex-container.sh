@@ -33,8 +33,6 @@ project_dir="$(basename "$PWD")"
 args=(
 	run
 	--rm
-	--interactive
-	--tty
 	--cap-add NET_ADMIN
 	--cap-add NET_RAW
 	--env CONTAINER_UID="$(id -u)"
@@ -46,6 +44,14 @@ args=(
 	--volume "$PWD":"/workspaces/$project_dir"
 	--workdir "/workspaces/$project_dir"
 )
+
+# CONTAINER_DETACH=1 starts the container in the background for a
+# non-interactive run (`codex exec ...`); --rm still removes it on exit.
+if [ -n "$CONTAINER_DETACH" ]; then
+	args+=(--detach)
+else
+	args+=(--interactive --tty)
+fi
 
 if [ "$CONTAINER_ENGINE" = "podman" ]; then
 	if [ "$("$CONTAINER_ENGINE" info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" = "true" ]; then

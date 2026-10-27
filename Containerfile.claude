@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	iproute2 \
 	dnsutils \
 	aggregate \
+	wl-clipboard \
+	xclip \
 	&& install -d -m 0755 /etc/apt/keyrings \
 	&& curl -fsSL https://packages.sury.org/php/apt.gpg -o /etc/apt/keyrings/php-sury.gpg \
 	&& echo "deb [signed-by=/etc/apt/keyrings/php-sury.gpg] https://packages.sury.org/php/ $(. /etc/os-release && echo "$VERSION_CODENAME") main" > /etc/apt/sources.list.d/php-sury.list \
