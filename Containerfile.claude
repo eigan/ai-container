@@ -1,8 +1,10 @@
-FROM node:24-slim
+FROM node:26-slim
 
 ARG CLAUDE_CODE_VERSION=latest
 ARG PHP_VERSION=8.4
-ARG GIT_DELTA_VERSION=0.18.2
+ARG GIT_DELTA_VERSION=0.20.1
+ARG GIT_DELTA_SHA256_AMD64=0683067a4cbbcc19b9fd2841253131d1b37ccfa724725098d811d4d0d9fcc25b
+ARG GIT_DELTA_SHA256_ARM64=6e08b734d611037eb9eb5db883cab7ac0a089216a9efdc1d2caac44319029c28
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
 	ca-certificates \
@@ -41,16 +43,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # git-delta isn't packaged for Debian until trixie; grab the upstream .deb instead.
 RUN ARCH=$(dpkg --print-architecture) \
-	&& curl -fsSLO "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" \
-	&& dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" \
-	&& rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
+	&& case "$ARCH" in \
+		amd64) SHA256="$GIT_DELTA_SHA256_AMD64" ;; \
+		arm64) SHA256="$GIT_DELTA_SHA256_ARM64" ;; \
+		*) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+	esac \
+	&& DEB="git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" \
+	&& curl -fsSLO "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/${DEB}" \
+	&& echo "${SHA256}  ${DEB}" | sha256sum -c - \
+	&& dpkg -i "$DEB" \
+	&& rm "$DEB"
 
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
 ENV CLAUDE_CONFIG_DIR=/home/node/.claude
+# gosu runs as the host uid, which has no passwd entry, so HOME ends up as "/".
+# Claude's update check shells out to `npm view`, which dies without a writable cache.
+ENV NPM_CONFIG_CACHE=/tmp/npm-cache
+# node:26 ships /home/node as 0700, which locks the host uid out of the mounted config dir.
 RUN mkdir -p /home/node/.claude \
 	&& mkdir -p /workspaces \
 	&& chown -R node:node /home/node/.claude /workspaces \
+	&& chmod 755 /home/node \
 	&& git config --system core.pager delta \
 	&& git config --system interactive.diffFilter "delta --color-only" \
 	&& git config --system delta.navigate true \
