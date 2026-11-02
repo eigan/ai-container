@@ -60,6 +60,32 @@ if [ -n "$CONTAINER_EXTRA_ARGS" ]; then
 	args+=("${container_extra_args[@]}")
 fi
 
+# Claude Code reads pasted images from the clipboard via wl-paste (Wayland) or
+# xclip (X11), so expose the host display socket. Set SKIP_CLIPBOARD=true to
+# keep the container away from your clipboard.
+if [ "${SKIP_CLIPBOARD:-false}" != "true" ]; then
+	if [ -n "$WAYLAND_DISPLAY" ] && [ -S "${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}" ]; then
+		args+=(
+			--volume "${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/tmp/xdg-runtime/${WAYLAND_DISPLAY}"
+			--env XDG_RUNTIME_DIR=/tmp/xdg-runtime
+			--env WAYLAND_DISPLAY="$WAYLAND_DISPLAY"
+			--env XDG_SESSION_TYPE=wayland
+		)
+	elif [ -n "$DISPLAY" ] && [ -d /tmp/.X11-unix ]; then
+		args+=(
+			--volume /tmp/.X11-unix:/tmp/.X11-unix:ro
+			--env DISPLAY="$DISPLAY"
+			--env XDG_SESSION_TYPE=x11
+		)
+		if [ -n "$XAUTHORITY" ] && [ -f "$XAUTHORITY" ]; then
+			args+=(
+				--volume "$XAUTHORITY:/tmp/.Xauthority:ro"
+				--env XAUTHORITY=/tmp/.Xauthority
+			)
+		fi
+	fi
+fi
+
 if [ -n "$SKIP_FIREWALL" ]; then
 	args+=(--env SKIP_FIREWALL="$SKIP_FIREWALL")
 fi

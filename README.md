@@ -17,6 +17,8 @@ This repo includes `Containerfile.claude`, which installs the `@anthropic-ai/cla
 $ docker build -t claude-code:latest -f Containerfile.claude .
 ```
 
+To pick up new CLI releases later, run `bin/rebuild` — it rebuilds both `claude-code:latest` and `codex:latest` with `--pull --no-cache` (pass `claude` or `codex` to rebuild just one; honors `CONTAINER_ENGINE`).
+
 Alternatively, Anthropic maintains their own Containerfile for Claude Code, used for their VS Code extension. Clone `git@github.com:anthropics/claude-code.git`, enter the `.devcontainer` directory, and build from there instead if you'd rather track theirs directly (it also adds zsh and other niceties not included here):
 
 ```shell
@@ -85,9 +87,15 @@ codex-work() {
 
 If `OPENAI_API_KEY` is set in your shell when you run the script, it's passed through to the container. Alternatively, run `codex` inside the container and log in with your ChatGPT account; the resulting credentials are written to the mounted `.codex-<env>` directory and persist across runs.
 
+Set `CONTAINER_DETACH=1` to start the container in the background instead of with a terminal, for a non-interactive run such as `codex-container.sh work exec "<prompt>"`. It is still started with `--rm`, so it removes itself when Codex exits.
+
 ### The `.codex-<env>` directory
 
 Each environment name maps to a directory on your local machine at `$HOME/.codex-<env>` (e.g. `$HOME/.codex-work`). This directory is mounted into the container at `/home/node/.codex`, which is Codex CLI's config directory (`CODEX_HOME`), holding `auth.json`, `config.toml`, and session history for that environment.
+
+## Pasting images
+
+Claude Code reads pasted images (Ctrl+V) from the clipboard with `wl-paste` (Wayland) or `xclip` (X11). `claude-container.sh` mounts the host's Wayland socket (or `/tmp/.X11-unix` and `$XAUTHORITY` on X11) into the container so this works. Note that this gives the container read/write access to your clipboard; set `SKIP_CLIPBOARD=true` to disable it.
 
 ## Network firewall
 
